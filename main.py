@@ -2,9 +2,9 @@ import argparse
 import os 
 from rich.console import Console 
 from rich.prompt import Prompt 
-from OfficeBot.agent import run_agent 
-from OfficeBot.state import SessionState 
-from OfficeBot.config import DEFAULT_WORKDIR 
+from agent import run_agent 
+from state import SessionState 
+from config import DEFAULT_WORKDIR 
 
 console = Console()
 

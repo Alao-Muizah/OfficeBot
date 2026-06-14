@@ -7,7 +7,7 @@ from state import SessionState
 
 from tools.word import (
     create_word_doc, read_word_doc, append_paragraph,
-    add_heading, replace_text, set_font, insert_table, bold_text
+    add_heading, replace_text, set_font, insert_table, text_format
 )
 from tools.excel import (
     create_excel, read_sheet, write_headers, write_rows,
@@ -518,7 +518,7 @@ def dispatch_tool(tool_name: str, tool_args: dict, workdir: str) -> str:
     elif tool_name == "replace_text":          result = replace_text(**tool_args, workdir=workdir)
     elif tool_name == "set_font":              result = set_font(**tool_args, workdir=workdir)
     elif tool_name == "insert_table":          result = insert_table(**tool_args, workdir=workdir)
-    elif tool_name == "bold_text":             result = bold_text(**tool_args, workdir=workdir)
+    elif tool_name == "bold_text":             result = text_format(**tool_args, workdir=workdir)
     elif tool_name == "create_excel":          result = create_excel(**tool_args, workdir=workdir)
     elif tool_name == "read_sheet":            result = read_sheet(**tool_args, workdir=workdir)
     elif tool_name == "write_headers":         result = write_headers(**tool_args, workdir=workdir)

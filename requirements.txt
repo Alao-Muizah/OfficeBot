@@ -1,0 +1,6 @@
+groq
+python-docx
+openpyxl
+pdfplumber
+reportlab
+rich

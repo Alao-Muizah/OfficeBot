@@ -19,7 +19,8 @@ def analyse_excel(path: str, sheet_name: str, workdir: str) -> dict:
         return {"status": "error", "message": f"File not found: {full_path}"}
 
     try:
-        df = pd.read_excel(full_path, sheet_name=sheet_name)
+        df = pd.read_excel(full_path, sheet_name=sheet_name, header=None)
+        df.columns = [f"Column_{i+1}" for i in range(len(df.columns))]
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

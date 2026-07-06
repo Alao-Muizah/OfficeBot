@@ -510,6 +510,16 @@ TOOLS = [
 # DISPATCH
 # =============================================================================
 
+def _json_default(obj):
+    import numpy as np
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return str(obj)
+
 def dispatch_tool(tool_name: str, tool_args: dict, workdir: str) -> str:
     if   tool_name == "create_word_doc":      result = create_word_doc(**tool_args, workdir=workdir)
     elif tool_name == "read_word_doc":         result = read_word_doc(**tool_args, workdir=workdir)
@@ -544,7 +554,7 @@ def dispatch_tool(tool_name: str, tool_args: dict, workdir: str) -> str:
     else:
         result = {"status": "error", "message": f"Unknown tool: {tool_name}"}
 
-    return json.dumps(result, indent=2)
+    return json.dumps(result, indent=2, default=_json_default)
 
 
 # =============================================================================

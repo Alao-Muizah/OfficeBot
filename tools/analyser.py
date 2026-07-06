@@ -45,12 +45,12 @@ def analyse_excel(path: str, sheet_name: str, workdir: str) -> dict:
             max_label = str(df.loc[max_idx, text_cols[0]])
 
         stats[col] = {
-            "min":     round(col_data.min(), 2),
-            "max":     round(col_data.max(), 2),
-            "average": round(col_data.mean(), 2),
-            "total":   round(col_data.sum(), 2),
-            "highest_in": max_label
-        }
+          "min":     float(round(col_data.min(), 2)),
+          "max":     float(round(col_data.max(), 2)),
+          "average": float(round(col_data.mean(), 2)),
+          "total":   float(round(col_data.sum(), 2)),
+          "highest_in": max_label
+}
 
     return {
         "status": "ok",

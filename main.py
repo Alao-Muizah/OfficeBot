@@ -8,6 +8,16 @@ from config import DEFAULT_WORKDIR
 
 console = Console()
 
+import argparse 
+import os 
+from rich.console import Console 
+from rich.prompt import Prompt 
+from agent import run_agent 
+from state import SessionState 
+from config import DEFAULT_WORKDIR 
+
+console = Console()
+
 def main():
 
     parser = argparse.ArgumentParser(description="OfficeBot - AI Office assistant")
@@ -25,7 +35,6 @@ def main():
     state = SessionState(workdir=args.workdir)
     state.load_from_file(SESSION_FILE)
 
-
     console.print("\n [bold green]OfficeBot[/bold green] - Word & Excel AI Assistant")
     console.print(f"Working directory: [cyan]{args.workdir}[/cyan]")
     console.print("Type your instruction. Type [bold]exit[/bold] to quit. \n")
@@ -34,20 +43,28 @@ def main():
         user_input = Prompt.ask("[bold]You[/bold]")
 
         if user_input.strip().lower() in ("exit", "quit"):
-            state.save_to_file(SESSION_FILE)     
+            state.save_to_file(SESSION_FILE)
             console.print("Bye.")
-            break 
+            break
+
         if not user_input.strip():
-            continue 
+            continue
 
         console.print("\n[bold yellow]Bot[/bold yellow]")
 
-        response = run_agent(user_input, state=state)
-        console.print(response)
-        print()
+        try:
+            response = run_agent(user_input, state=state)
+            console.print(response)
+            state.save_to_file(SESSION_FILE)  
+        except Exception as e:
+            console.print(f"[bold red]Error:[/bold red] {e}")
+            console.print("[dim]Session not saved due to error.[/dim]")
+
+        console.print()
 
 
 if __name__ == "__main__":
     main()
 
 
+    

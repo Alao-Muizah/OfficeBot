@@ -21,7 +21,7 @@ from tools.converter import (
 from tools.filesystem import (
     fetch_file, list_files, copy_file, delete_file, rename_file
 )
-from tools.analyser import analyse_excel, summarise_pdf, summarise_word
+from tools.analyser import analyse_excel, summarise_pdf, summarise_word, analyse_csv
 
 client = Mistral(api_key=API_KEY)
 
@@ -447,12 +447,12 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "rename_file",
-            "description": "Renames a file within the same directory.",
+            "description": "Renames a file. Works on any file path the user provides, inside or outside the working directory.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path":     {"type": "string", "description": "Current filename or path"},
-                    "new_name": {"type": "string", "description": "New filename e.g. 'report_v2.docx'"}
+                    "path":     {"type": "string", "description": "Full path or filename of the file to rename"},
+                    "new_name": {"type": "string", "description": "New filename only, e.g. 'report_v2.docx'"}
                 },
                 "required": ["path", "new_name"]
             }
@@ -501,8 +501,22 @@ TOOLS = [
                 },
                 "required": ["path"]
             }
+        } 
+    },
+    {
+    "type": "function",
+    "function": {
+        "name": "analyse_csv",
+        "description": "Analyses a CSV file using pandas and returns statistics — min, max, average, median, total, and trends per numeric column. Use this when the user asks to summarise, analyse, or explain trends in a CSV file.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Path to the CSV file"}
+            },
+            "required": ["path"]
         }
     }
+}
 ]
 
 
@@ -521,6 +535,7 @@ def _json_default(obj):
     return str(obj)
 
 def dispatch_tool(tool_name: str, tool_args: dict, workdir: str) -> str:
+    
     if   tool_name == "create_word_doc":      result = create_word_doc(**tool_args, workdir=workdir)
     elif tool_name == "read_word_doc":         result = read_word_doc(**tool_args, workdir=workdir)
     elif tool_name == "append_paragraph":      result = append_paragraph(**tool_args, workdir=workdir)
@@ -549,6 +564,7 @@ def dispatch_tool(tool_name: str, tool_args: dict, workdir: str) -> str:
     elif tool_name == "delete_file":           result = delete_file(**tool_args, workdir=workdir)
     elif tool_name == "rename_file":           result = rename_file(**tool_args, workdir=workdir)
     elif tool_name == "analyse_excel":         result = analyse_excel(**tool_args, workdir=workdir)
+    elif tool_name == "analyse_csv":           result = analyse_csv(**tool_args, workdir=workdir)
     elif tool_name == "summarise_pdf":         result = summarise_pdf(**tool_args, workdir=workdir)
     elif tool_name == "summarise_word":        result = summarise_word(**tool_args, workdir=workdir)
     else:
@@ -567,18 +583,26 @@ def run_agent(user_message: str, state: SessionState) -> str:
 
     system_prompt = f"""You are OfficeBot. Your only job is to execute the user's instruction using the correct tool.
 
-    Working directory: {workdir}
+        access the Working directory here: {workdir}
 
-    {state.get_context_summary()}
+        {state.get_context_summary()}
 
-    - Execute the user's instruction exactly as stated. Use the exact filenames, titles, values, and data the user provides. Do not invent or substitute anything.
-    - Call only the tool the instruction requires. Do not call extra tools before or after.
-    - Use only the filename in path arguments unless the user gives a full path — in that case use the full path exactly.
-    - If the instruction is complete, act immediately without asking questions.
-    - After calling a tool, respond in plain English explaining what was done or what the result means. Never show raw JSON or numbers without explanation.
-    - For analyse_excel: after getting the stats, narrate the trends clearly — explain what the dataset is about, which values are high or low, and what patterns stand out.
-    - For summarise_pdf and summarise_word: after getting the content, give a clear plain English summary of what the document is about. Do not repeat the raw text.
-    """
+        - Execute the user's instruction exactly as stated. Use the exact filenames, titles, values, and data the user provides. Do not invent or substitute anything.
+        - Call only the tool the instruction requires. Do not call extra tools before or after.
+        - Always use the exact path the user provides. If the user gives a full path like C:/Users/.../file.docx, pass that full path exactly to the tool. Never strip it down to just the filename.
+        - If the instruction is complete, act immediately without asking questions.
+        - After calling a tool, respond in plain English explaining what was done or what the result means. Never show raw JSON or numbers without explanation.
+        - For analyse_csv: after getting the stats, narrate the trends clearly — explain what the dataset is about, which values are high or low, and what patterns stand out.
+        - For summarise_pdf and summarise_word: after getting the content, give a clear plain English summary of what the document is about. Do not repeat the raw text.
+        - list_files can access ANY directory the user specifies, not just the working directory. Never tell the user you can only access the working directory.
+        - rename_file can rename files in ANY directory the user specifies, not just the working directory. Never tell the user you can only rename files in the working directory.
+        - rename_file works on ANY path. It has no working directory restriction. Never refuse to rename a file based on its location.
+        - delete_file can delete files in ANY directory the user specifies. Never refuse to delete a file based on its location.
+        - Never call the same tool twice with the same arguments. If a tool was already called, wait for the result.
+        - NEVER suggest follow-up actions, next steps, or additional analyses. Only do what the user explicitly asked.
+        - NEVER call a tool that is not in your tools list. If the user asks for something you have no tool for, say so in plain English instead of improvising.
+        """
+
 
     if len(state.history) > 6:
         state.history = state.history[-6:]
@@ -659,10 +683,21 @@ def run_agent(user_message: str, state: SessionState) -> str:
                             note=tool_result.get("message", "used")
                         )
 
+                    # if tool_name == "delete_file":
+                    #     state.remove_file(os.path.basename(tool_args.get("path", "")))
+                    # elif tool_name == "rename_file":
+                    #     state.remove_file(os.path.basename(tool_args.get("path", "")))
                     if tool_name == "delete_file":
                         state.remove_file(os.path.basename(tool_args.get("path", "")))
                     elif tool_name == "rename_file":
-                        state.remove_file(os.path.basename(tool_args.get("path", "")))
+                        old_name = os.path.basename(tool_args.get("path", ""))
+                        new_name = tool_args.get("new_name", "")
+                        state.remove_file(old_name)  # remove old name from session
+                        state.register_file(         # register new name
+                            filename=new_name,
+                            full_path=tool_result.get("path", ""),
+                            note=tool_result.get("message", "renamed")
+                        )
 
                 tool_msg = {
                     "role": "tool",

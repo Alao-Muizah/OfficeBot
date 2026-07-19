@@ -1,6 +1,7 @@
 import os 
 import shutil 
 from datetime import datetime 
+from send2trash import send2trash
 
 def _resolve_path(path:str, workdir:str) -> str:
 
@@ -31,7 +32,7 @@ def fetch_file(path:str, workdir:str) -> dict:
     if size_bytes < 1024:
         size_str = f"{size_bytes}B"
     elif size_bytes < 1024 ** 2 :
-        size_str = f"{size_bytes / 1024:.1F} KB"
+        size_str = f"{size_bytes / 1024:.1f} KB"
     else:
         size_str = f"{size_bytes / (1024 ** 2):.1f} MB"
 
@@ -53,6 +54,7 @@ def fetch_file(path:str, workdir:str) -> dict:
 # ====================== List files ====================== #
 
 def list_files(directory:str, workdir:str) -> dict:
+    
     if not directory or directory.strip() in (".", "", "workdir"):
         target_dir = workdir
     else:
@@ -73,16 +75,18 @@ def list_files(directory:str, workdir:str) -> dict:
     for name in os.listdir(target_dir):
         full_path = os.path.join(target_dir, name)
 
-        # to skip the hidden files or directories
         if name.startswith(".") or not os.path.isfile(full_path):
             continue 
 
         extension = os.path.splitext(name)[1].lower()
-
-        if extension not in allowed_extension:
-            continue
+        # if extension not in allowed_extension:
+        #     continue
+        
 
         size_byte = os.path.getsize(full_path)
+
+        # size_byte = os.path.getsize(full_path)
+        size_str = ""
 
         if size_byte < 1024:
             size_str = f"{size_byte} B"
@@ -97,8 +101,8 @@ def list_files(directory:str, workdir:str) -> dict:
             "size": size_str
         })
 
-        # For alphabetical sorting
-        files.sort(key=lambda f: f['name'])
+    # For alphabetical sorting
+    files.sort(key=lambda f: f['name'])
 
     return {
         "status": "ok",
@@ -142,66 +146,50 @@ def copy_file(source_path:str, destination_path:str, workdir:str) -> dict:
     }
 
 
-# ====================== List files ====================== #
+# ====================== Delete files ====================== #
 
-def delete_file(path:str, workdir:str) -> dict:
-
-    full_path = _resolve_path(path, workdir)
+def delete_file(path: str, workdir: str) -> dict:
+    full_path = path if os.path.isabs(path) else os.path.join(workdir, path)
 
     if not os.path.exists(full_path):
-        return {
-            "status": "error",
-            "message": f"File not found '{full_path}'"
-        }
-    
-    if not os.path.isfile(full_path):
-        return {
-            "status": "eror",
-            "message": f"'{path}' is a directory, only files can be deletd this way"
-        }
-    
-    real_file = os.path.realpath(full_path)
-    real_workdir = os.path.realpath(workdir)
+        return {"status": "error", "message": f"File not found: {full_path}"}
 
-    if not real_file.startswith(real_workdir):
-        return {
-            "status": "error",
-            "message": f"Cannot delete files outside the woring directory"
-        }
-    
-    os.remove(full_path)
-
-    return {
-        "status": "ok",
-        "message": f"Deleted '{path}'"
-    }
+    try:
+        send2trash(full_path)
+        return {"status": "ok", "message": f"Moved {full_path} to Recycle Bin"}
+    except Exception as e:
+        return {"status": "error", "message": f"Could not delete {full_path}: {e}"}
 
 
 # ====================== Renaming files ====================== #
 
-def rename_file(path:str, new_name:str, workdir:str) -> dict:
+def rename_file(path: str, new_name: str, workdir: str) -> dict:
 
-    full_path = _resolve_path(path, workdir)
+    # if absolute path use it directly, else join with workdir
+    if os.path.isabs(path):
+        full_path = path
+    else:
+        full_path = os.path.join(workdir, path)
+    if os.path.isabs(path):
+        full_path = path
+    else:
+        full_path = os.path.join(workdir, path)
 
     if not os.path.exists(full_path):
-        return {
-            "status": "error",
-            "message": f"File not found '{full_path}'"
-        }
-    
-    parent_dir = os.path.dirname(full_path)
-    new_full_path = os.path.join(parent_dir, new_name)
+        return {"status": "error", "message": f"File not found: {full_path}"}
 
-    if os.path.exists(new_full_path):
-        return {
-            "status": "error",
-            "message": f"Afile named '{new_full_path}' already exists in that directory"
-        }
-    
-    os.rename(full_path, new_full_path)
+    if not os.path.isfile(full_path):
+        return {"status": "error", "message": f"'{full_path}' is not a file"}
+
+    new_path = os.path.join(os.path.dirname(full_path), new_name)
+
+    if os.path.exists(new_path):
+        return {"status": "error", "message": f"A file named '{new_name}' already exists"}
+
+    os.rename(full_path, new_path)
 
     return {
         "status": "ok",
-        "message": f"REnamed '{path}' to '{new_name}'",
-        "new_path": new_full_path
+        "message": f"Renamed '{os.path.basename(full_path)}' to '{new_name}'",
+        "path": new_path
     }

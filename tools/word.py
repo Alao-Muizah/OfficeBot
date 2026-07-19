@@ -45,7 +45,6 @@ def read_word_doc(path:str, workdir:str)-> dict:
  
     return {"status": "ok", "content": content, "paragraph_count": len(lines)}
 
-
 # ====================== Append new paragraph ====================== #
 
 def append_paragraph(path: str, text: str, workdir: str) -> dict:
